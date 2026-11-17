@@ -39,6 +39,10 @@ export function createApp(place: Place) {
       res.status(400).json({ error: err.message });
       return;
     }
+    if (clientStatus(err) === 400) {
+      res.status(400).json({ error: "invalid json" });
+      return;
+    }
     console.error(err);
     res.status(500).json({ error: "failed to place order" });
   });
@@ -47,11 +51,21 @@ export function createApp(place: Place) {
 }
 
 function readOrderBody(body: unknown, header: string | undefined): PlaceOrderInput {
-  const record = typeof body === "object" && body !== null ? (body as Record<string, unknown>) : {};
+  const record = recordOf(body);
   const fromBody = typeof record.idempotencyKey === "string" ? record.idempotencyKey : "";
   return {
     sku: typeof record.sku === "string" ? record.sku : "",
     qty: typeof record.qty === "number" ? record.qty : Number.NaN,
     idempotencyKey: fromBody || header || "",
   };
+}
+
+function recordOf(body: unknown): Record<string, unknown> {
+  if (typeof body !== "object" || body === null || Array.isArray(body)) return {};
+  return body as Record<string, unknown>;
+}
+
+export function clientStatus(err: unknown) {
+  if (typeof err !== "object" || err === null || !("status" in err)) return undefined;
+  return err.status;
 }
