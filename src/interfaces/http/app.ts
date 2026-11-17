@@ -2,6 +2,7 @@ import express, { type NextFunction, type Request, type Response } from "express
 import type { PlaceOrderInput, PlacedOrder } from "../../domain/order.js";
 import { InvalidOrder } from "../../domain/order.js";
 import { assignRequestId } from "./request-id.js";
+import { orderAccessLine } from "./order-log.js";
 
 type Place = (input: PlaceOrderInput) => Promise<PlacedOrder>;
 
@@ -19,7 +20,9 @@ export function createApp(place: Place) {
     try {
       const input = readOrderBody(req.body, req.header("idempotency-key"));
       const order = await place(input);
-      res.status(order.created ? 201 : 200).json({
+      const status = order.created ? 201 : 200;
+      console.log(orderAccessLine(status, order.sku));
+      res.status(status).json({
         id: order.id,
         sku: order.sku,
         qty: order.qty,
