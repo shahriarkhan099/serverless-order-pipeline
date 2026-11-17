@@ -1,6 +1,7 @@
 export type AppConfig = {
   kafkaBrokers: string[];
   port: number;
+  outboxBatch: number;
 };
 
 export function readConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
@@ -12,5 +13,9 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     .split(",")
     .map((part) => part.trim())
     .filter(Boolean);
-  return { kafkaBrokers, port };
+  const outboxBatch = Number(env.OUTBOX_BATCH ?? 20);
+  if (!Number.isInteger(outboxBatch) || outboxBatch < 1) {
+    throw new Error("OUTBOX_BATCH must be a positive integer");
+  }
+  return { kafkaBrokers, port, outboxBatch };
 }
