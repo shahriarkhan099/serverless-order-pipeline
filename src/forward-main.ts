@@ -1,18 +1,34 @@
 import { toWorkItem } from "./application/forward.js";
 import { MemoryQueue } from "./infrastructure/memory-queue.js";
+import { launchIfMain } from "./runtime.js";
 
-const raw = process.argv[2];
-if (!raw) {
-  console.error("usage: tsx src/forward-main.ts '<order event json>'");
-  process.exitCode = 1;
-} else {
-  const item = toWorkItem(JSON.parse(raw) as { id?: unknown; type?: unknown; orderId?: unknown });
-  if (!item) {
-    console.error("event was not forwarded");
-    process.exitCode = 1;
-  } else {
-    const queue = new MemoryQueue();
-    await queue.send(item.queue, item.body);
-    console.log(item.queue);
+type Log = { log: (message: string) => void; error: (message: string) => void };
+
+export async function forwardCommand(raw: string | undefined, queue?: MemoryQueue, write: Log = console) {
+  if (!raw) {
+    write.error("usage: tsx src/forward-main.ts '<order event json>'");
+    return 1;
   }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    write.error("event was not forwarded");
+    return 1;
+  }
+  const item = toWorkItem(parsed as { id?: unknown; type?: unknown; orderId?: unknown });
+  if (!item) {
+    write.error("event was not forwarded");
+    return 1;
+  }
+  const target = queue ?? new MemoryQueue();
+  await target.send(item.queue, item.body);
+  write.log(item.queue);
+  return 0;
 }
+
+export async function runForward(raw = process.argv[2]) {
+  process.exitCode = await forwardCommand(raw);
+}
+
+void launchIfMain(process.argv[1], import.meta.url, runForward);

@@ -130,12 +130,35 @@ npx tsx src/forward-main.ts '{"id":"1","type":"order.placed","orderId":"ord_1"}'
 
 ## How to test
 
+The tests read `DATABASE_URL` from `.env` and write to that Postgres database. Create it and apply the migrations before the first run:
+
+```bash
+createdb orders_test
+cp .env.example .env
+npm install
+npx prisma generate
+npx prisma migrate deploy
+```
+
+Typecheck, then run every file in `test/`:
+
 ```bash
 npm run typecheck
 npm test
 ```
 
-GitHub Actions runs the same steps against Postgres 16. The job is capped at 15 minutes.
+`npm test` runs those files one at a time, because they share `orders_test`. It fails unless `src` stays at 100% line, branch, and function coverage. The tests do not call AWS. Kafka is a fake producer.
+
+Run one file the same way:
+
+```bash
+node --import tsx --test --test-concurrency=1 test/orders.test.ts
+node --import tsx --test --test-concurrency=1 test/scenarios.test.ts
+```
+
+Any other file in `test/` works in that command. `test/orders.test.ts` needs the database. `test/sku.test.ts`, `test/work-order.test.ts`, and `test/forward.test.ts` do not.
+
+GitHub Actions runs `npm run typecheck` and `npm test` against Postgres 16. The job is capped at 15 minutes.
 
 ## How to deploy
 

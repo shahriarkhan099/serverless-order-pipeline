@@ -1,4 +1,9 @@
-import { ConditionalCheckFailedException, DynamoDBClient, PutItemCommand } from "@aws-sdk/client-dynamodb";
+import {
+  ConditionalCheckFailedException,
+  DeleteItemCommand,
+  DynamoDBClient,
+  PutItemCommand,
+} from "@aws-sdk/client-dynamodb";
 import type { EffectClaim } from "../application/effects.js";
 
 export function dynamoEffects(client: DynamoDBClient, tableName: string): EffectClaim {
@@ -17,6 +22,14 @@ export function dynamoEffects(client: DynamoDBClient, tableName: string): Effect
         if (err instanceof ConditionalCheckFailedException) return false;
         throw err;
       }
+    },
+    async release(eventId: string) {
+      await client.send(
+        new DeleteItemCommand({
+          TableName: tableName,
+          Key: { eventId: { S: eventId } },
+        }),
+      );
     },
   };
 }

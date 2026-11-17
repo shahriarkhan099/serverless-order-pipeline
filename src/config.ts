@@ -13,6 +13,7 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     .split(",")
     .map((part) => part.trim())
     .filter(Boolean);
+  if (kafkaBrokers.length === 0) throw new Error("KAFKA_BROKERS must list at least one broker");
   const outboxBatch = Number(env.OUTBOX_BATCH ?? 20);
   if (!Number.isInteger(outboxBatch) || outboxBatch < 1) {
     throw new Error("OUTBOX_BATCH must be a positive integer");

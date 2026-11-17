@@ -1,17 +1,25 @@
-import { Kafka } from "kafkajs";
+import { Kafka, type Producer } from "kafkajs";
 import type { MessageSender } from "../application/ports.js";
 
-export function createKafkaSender(brokers: string[]) {
-  const kafka = new Kafka({ clientId: "orders", brokers });
-  const producer = kafka.producer();
+export type KafkaProducer = Pick<Producer, "send" | "connect" | "disconnect">;
+
+export function createKafkaSender(brokers: string[], producer?: KafkaProducer) {
+  const active =
+    producer ??
+    new Kafka({
+      clientId: "orders",
+      brokers,
+      connectionTimeout: 1000,
+      retry: { retries: 0 },
+    }).producer();
   const sender: MessageSender = {
     send(batch) {
-      return producer.send({ topic: batch.topic, messages: batch.messages }).then(() => undefined);
+      return active.send({ topic: batch.topic, messages: batch.messages }).then(() => undefined);
     },
   };
   return {
     sender,
-    connect: () => producer.connect(),
-    disconnect: () => producer.disconnect(),
+    connect: () => active.connect(),
+    disconnect: () => active.disconnect(),
   };
 }
