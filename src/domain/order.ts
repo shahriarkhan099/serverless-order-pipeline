@@ -24,6 +24,7 @@ export function assertOrderInput(input: PlaceOrderInput): PlaceOrderInput {
   const sku = input.sku.trim();
   const idempotencyKey = input.idempotencyKey.trim();
   if (!sku) throw new InvalidOrder("sku is required");
+  if (sku.length > 80) throw new InvalidOrder("sku is too long");
   if (!Number.isInteger(input.qty) || input.qty < 1) {
     throw new InvalidOrder("qty must be a positive integer");
   }
