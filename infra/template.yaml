@@ -1,0 +1,60 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Order side effects. The Express API stays a long-running process.
+
+Parameters:
+  EffectTableName:
+    Type: String
+    Default: order-effects
+
+Resources:
+  EffectTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref EffectTableName
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: eventId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: eventId
+          KeyType: HASH
+
+  OrderFailedQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: order-failed
+
+  OrderWorkDeadLetter:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: order-work-dlq
+
+  OrderWorkQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: order-work
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt OrderWorkDeadLetter.Arn
+        maxReceiveCount: 5
+
+  OrderWorkFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: order-work
+      Runtime: nodejs22.x
+      Handler: src/interfaces/lambda/handler.handleOrderWork
+      Timeout: 30
+      Environment:
+        Variables:
+          EFFECT_TABLE: !Ref EffectTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref EffectTable
+      Events:
+        WorkQueue:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt OrderWorkQueue.Arn
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
