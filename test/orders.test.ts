@@ -2,10 +2,13 @@ import assert from "node:assert/strict";
 import { after, beforeEach, test } from "node:test";
 import { InvalidOrder } from "../src/domain/order.js";
 import { placeOrder } from "../src/application/place-order.js";
+import { ordersTopic } from "../src/application/ports.js";
 import { prisma } from "../src/infrastructure/db.js";
 import { PrismaOrderStore, writeOrderWithOutbox } from "../src/infrastructure/prisma-order-store.js";
+import { PrismaOutbox } from "../src/infrastructure/prisma-outbox.js";
 
 const store = new PrismaOrderStore(prisma);
+const outbox = new PrismaOutbox(prisma);
 
 beforeEach(async () => {
   await prisma.outbox.deleteMany();
@@ -53,4 +56,38 @@ test("qty below 1 does not write", async () => {
     InvalidOrder,
   );
   assert.equal(await prisma.order.count(), 0);
+});
+
+test("publisher stamps a row only after the send succeeds", async () => {
+  const order = await placeOrder(store, { sku: "mug", qty: 2, idempotencyKey: "pub-1" });
+  const sent: { topic: string; key?: string; value: string }[] = [];
+
+  const count = await outbox.publishPending({
+    async send(batch) {
+      for (const message of batch.messages) sent.push({ topic: batch.topic, key: message.key, value: message.value });
+    },
+  });
+
+  assert.equal(count, 1);
+  assert.equal(sent[0]?.topic, ordersTopic);
+  assert.equal(sent[0]?.key, order.id);
+  const event = JSON.parse(sent[0]?.value ?? "{}");
+  assert.equal(event.orderId, order.id);
+  assert.equal(event.sku, "mug");
+  assert.equal(event.qty, 2);
+  assert.ok((await prisma.outbox.findFirstOrThrow()).publishedAt);
+});
+
+test("a rejected send leaves the outbox row unpublished", async () => {
+  await placeOrder(store, { sku: "mug", qty: 1, idempotencyKey: "pub-2" });
+  await assert.rejects(
+    () =>
+      outbox.publishPending({
+        async send() {
+          throw new Error("broker down");
+        },
+      }),
+    /broker down/,
+  );
+  assert.equal((await prisma.outbox.findFirstOrThrow()).publishedAt, null);
 });
