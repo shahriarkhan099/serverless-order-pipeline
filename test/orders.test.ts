@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
 import { after, beforeEach, test } from "node:test";
+import type { AddressInfo } from "node:net";
 import { InvalidOrder } from "../src/domain/order.js";
 import { placeOrder } from "../src/application/place-order.js";
 import { ordersTopic } from "../src/application/ports.js";
 import { prisma } from "../src/infrastructure/db.js";
 import { PrismaOrderStore, writeOrderWithOutbox } from "../src/infrastructure/prisma-order-store.js";
 import { PrismaOutbox } from "../src/infrastructure/prisma-outbox.js";
+import { createApp } from "../src/interfaces/http/app.js";
 
 const store = new PrismaOrderStore(prisma);
 const outbox = new PrismaOutbox(prisma);
@@ -91,3 +93,29 @@ test("a rejected send leaves the outbox row unpublished", async () => {
   );
   assert.equal((await prisma.outbox.findFirstOrThrow()).publishedAt, null);
 });
+
+test("POST /orders returns the same order for a repeated key", async () => {
+  const app = createApp((input) => placeOrder(store, input));
+  const server = app.listen(0);
+  const { port } = server.address() as AddressInfo;
+  try {
+    const first = await post(port, { sku: "mug", qty: 1, idempotencyKey: "http-1" });
+    const second = await post(port, { sku: "mug", qty: 1, idempotencyKey: "http-1" });
+    assert.equal(first.status, 201);
+    assert.equal(second.status, 200);
+    assert.equal(second.body.id, first.body.id);
+    const missing = await post(port, { sku: "", qty: 1, idempotencyKey: "http-2" });
+    assert.equal(missing.status, 400);
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close((err) => (err ? reject(err) : resolve())));
+  }
+});
+
+async function post(port: number, body: unknown) {
+  const response = await fetch(`http://127.0.0.1:${port}/orders`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return { status: response.status, body: (await response.json()) as { id?: string } };
+}
