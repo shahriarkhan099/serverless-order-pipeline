@@ -94,6 +94,16 @@ test("a rejected send leaves the outbox row unpublished", async () => {
   assert.equal((await prisma.outbox.findFirstOrThrow()).publishedAt, null);
 });
 
+
+test("publishing twice does not send the same row again", async () => {
+  await placeOrder(store, { sku: "mug", qty: 1, idempotencyKey: "pub-3" });
+  let sends = 0;
+  const sender = { async send() { sends += 1; } };
+  assert.equal(await outbox.publishPending(sender), 1);
+  assert.equal(await outbox.publishPending(sender), 0);
+  assert.equal(sends, 1);
+});
+
 test("POST /orders returns the same order for a repeated key", async () => {
   const app = createApp((input) => placeOrder(store, input));
   const server = app.listen(0);
