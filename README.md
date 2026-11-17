@@ -154,7 +154,7 @@ sam build --template infra/template.yaml
 sam deploy --guided
 ```
 
-The function handler exported for production wiring is `handleOrderWork`. It expects the caller to pass an effect claim and the side effect. The template names the DynamoDB table, the queues, and the redrive policy. A live deploy still needs the function entrypoint to construct `dynamoEffects` with `EFFECT_TABLE`. The tests cover the handler with `MemoryEffects` and a fake DynamoDB client that throws `ConditionalCheckFailedException`.
+`sam build` bundles `src/interfaces/lambda/entry.ts`. The exported function is `handler`. It claims the event in the table named by `EFFECT_TABLE` and logs the order id. That log is the side effect included in the repo. `handleOrderWork` is the function the entry calls. The tests cover it with `MemoryEffects` and a fake DynamoDB client that throws `ConditionalCheckFailedException`. They do not call AWS.
 
 ## What a failure looks like
 

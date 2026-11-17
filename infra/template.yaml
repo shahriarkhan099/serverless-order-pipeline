@@ -40,10 +40,17 @@ Resources:
 
   OrderWorkFunction:
     Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Target: es2022
+        Sourcemap: true
+        EntryPoints:
+          - src/interfaces/lambda/entry.ts
     Properties:
       FunctionName: order-work
       Runtime: nodejs22.x
-      Handler: src/interfaces/lambda/handler.handleOrderWork
+      Handler: entry.handler
       Timeout: 30
       Environment:
         Variables:
