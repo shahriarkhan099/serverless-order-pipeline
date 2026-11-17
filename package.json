@@ -2,7 +2,9 @@
   "name": "serverless-order-pipeline",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "tsx src/main.ts",
     "publish": "tsx src/publish-main.ts",
@@ -11,6 +13,7 @@
     "db:migrate": "prisma migrate deploy"
   },
   "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1170.0",
     "@prisma/client": "^6.19.0",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
