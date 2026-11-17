@@ -15,7 +15,7 @@ export function createApp(place: Place) {
 
   app.post("/orders", async (req, res, next) => {
     try {
-      const input = readOrderBody(req.body);
+      const input = readOrderBody(req.body, req.header("idempotency-key"));
       const order = await place(input);
       res.status(order.created ? 201 : 200).json({
         id: order.id,
@@ -41,11 +41,12 @@ export function createApp(place: Place) {
   return app;
 }
 
-function readOrderBody(body: unknown): PlaceOrderInput {
+function readOrderBody(body: unknown, header: string | undefined): PlaceOrderInput {
   const record = typeof body === "object" && body !== null ? (body as Record<string, unknown>) : {};
+  const fromBody = typeof record.idempotencyKey === "string" ? record.idempotencyKey : "";
   return {
     sku: typeof record.sku === "string" ? record.sku : "",
     qty: typeof record.qty === "number" ? record.qty : Number.NaN,
-    idempotencyKey: typeof record.idempotencyKey === "string" ? record.idempotencyKey : "",
+    idempotencyKey: fromBody || header || "",
   };
 }
