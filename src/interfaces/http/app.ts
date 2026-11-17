@@ -1,6 +1,7 @@
 import express, { type NextFunction, type Request, type Response } from "express";
 import type { PlaceOrderInput, PlacedOrder } from "../../domain/order.js";
 import { InvalidOrder } from "../../domain/order.js";
+import { assignRequestId } from "./request-id.js";
 
 type Place = (input: PlaceOrderInput) => Promise<PlacedOrder>;
 
@@ -8,6 +9,7 @@ export function createApp(place: Place) {
   const app = express();
   app.disable("x-powered-by");
   app.use(express.json({ limit: "16kb" }));
+  app.use(assignRequestId);
 
   app.get("/health", (_req, res) => {
     res.json({ ok: true });
